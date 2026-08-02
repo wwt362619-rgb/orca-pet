@@ -49,6 +49,8 @@ body {
 .pet-img.angry { animation: angryShake 0.4s ease-out; }
 .pet-img.shy { animation: shyHide 0.8s ease-out; }
 .pet-img.heart { animation: heartBeat 0.8s ease-out; }
+.pet-img.follow { animation: followWiggle 0.3s ease-out; }
+.pet-img.snuggle { animation: snuggleBump 0.5s ease-out; }
 @keyframes tapBounce {
   0% { transform: translateY(0) scale(1); }
   30% { transform: translateY(-15px) scale(1.1); }
@@ -124,6 +126,47 @@ body {
   75% { transform: scale(1.1); }
   100% { transform: scale(1); }
 }
+@keyframes followWiggle {
+  0%,100% { transform: translateX(0); }
+  50% { transform: translateX(8px); }
+}
+@keyframes snuggleBump {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.2) translateY(-10px); }
+  60% { transform: scale(0.95) translateY(3px); }
+  100% { transform: scale(1) translateY(0); }
+}
+.blush-dots {
+  position: absolute;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 5;
+}
+.blush-dots.show {
+  opacity: 1;
+  animation: blushPulse 0.6s ease-out;
+}
+.blush-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff6b6b;
+  animation: dotFloat 0.6s ease-out;
+}
+.blush-dots .dot:nth-child(2) { animation-delay: 0.1s; background: #ff8787; }
+.blush-dots .dot:nth-child(3) { animation-delay: 0.2s; background: #ffa8a8; }
+@keyframes blushPulse {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+@keyframes dotFloat {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-20px); opacity: 0; }
+}
 .bubble {
   position: absolute;
   top: -10px;
@@ -169,6 +212,8 @@ body {
 .bubble.jealous::after { border-top-color: #e8f5e9; }
 .bubble.love { background: #fce4ec; color: #e91e63; font-size: 16px; font-weight: bold; }
 .bubble.love::after { border-top-color: #fce4ec; }
+.bubble.lonely { background: #e3f2fd; color: #1565c0; font-size: 13px; }
+.bubble.lonely::after { border-top-color: #e3f2fd; }
 .heat-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -182,6 +227,11 @@ body {
 <body>
 <div class="pet-container" id="petContainer">
   <img class="pet-img" id="petImg" src="orca.png" alt="orca">
+  <div class="blush-dots" id="blushDots">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
   <div class="bubble" id="bubble"></div>
 </div>
 <div class="heat-overlay" id="heatOverlay"></div>
@@ -190,24 +240,36 @@ const SUPABASE_URL = 'https://xqsfkbvyrfvrtwqzusth.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9meu2NTqGMX6YvKaEPPamw_bvXu6gSA';
 const petImg = document.getElementById('petImg');
 const bubble = document.getElementById('bubble');
+const blushDots = document.getElementById('blushDots');
 const heatOverlay = document.getElementById('heatOverlay');
 let heat = 0;
 let tapCount = 0;
 let tapTimer = null;
 let bubbleTimer = null;
+let blushTimer = null;
 let isSleeping = false;
 let lastInteraction = Date.now();
-let mood = 'neutral';
+let lonelyStage = 0;
+let followMode = false;
+let followX = 0;
+let followY = 0;
 
 function resetIdle() {
   petImg.style.animation = '';
   petImg.style.animation = 'idleFloat 3s ease-in-out infinite';
 }
 
+function showBlush() {
+  clearTimeout(blushTimer);
+  blushDots.classList.add('show');
+  blushTimer = setTimeout(() => blushDots.classList.remove('show'), 1500);
+}
+
 window.petEngine = {
   onTap() {
     if (isSleeping) { this.wakeUp(); return; }
     lastInteraction = Date.now();
+    lonelyStage = 0;
     tapCount++;
     clearTimeout(tapTimer);
     tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
@@ -223,11 +285,13 @@ window.petEngine = {
       this.addHeat(10);
     } else if (tapCount >= 3) {
       this.doAnim('happy');
+      showBlush();
       this.showBubble('干嘛啦~', 'heart');
       this.addHeat(5);
     } else {
       this.doAnim('tap');
-      const msgs = ['嗯？', '嘻嘻', '嗷~', '？', '♡', '…', '哼', '诶嘿', '干嘛', '摸我干嘛'];
+      showBlush();
+      const msgs = ['嗯？', '嘻嘻', '嗷~', '？', '♡', '…', '哼', '诶嘿', '干嘛', '摸我干嘛', '///'];
       this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'heart');
       this.addHeat(2);
     }
@@ -237,6 +301,7 @@ window.petEngine = {
   onDoubleTap() {
     if (isSleeping) { this.wakeUp(); return; }
     lastInteraction = Date.now();
+    lonelyStage = 0;
     this.doAnim('doubletap');
     this.showBubble('！！！', 'angry');
     this.addHeat(8);
@@ -246,6 +311,7 @@ window.petEngine = {
   onLongPress() {
     if (isSleeping) { this.wakeUp(); return; }
     lastInteraction = Date.now();
+    lonelyStage = 0;
     this.doAnim('longpress');
     const msgs = ['……放手', '好痛', '你在干嘛', '不要这样', '压扁了…'];
     this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'whisper');
@@ -256,6 +322,7 @@ window.petEngine = {
   onFling(direction) {
     if (isSleeping) return;
     lastInteraction = Date.now();
+    lonelyStage = 0;
     const animClass = direction === 'left' ? 'fling-left' : 'fling-right';
     const crawlClass = direction === 'left' ? 'crawl-back-left' : 'crawl-back-right';
     petImg.style.animation = '';
@@ -272,6 +339,29 @@ window.petEngine = {
     this.logGesture('fling_' + direction);
   },
 
+  onFollow(x, y) {
+    if (isSleeping) return;
+    followX = x;
+    followY = y;
+    if (!followMode) {
+      followMode = true;
+      this.doAnim('follow');
+    }
+  },
+
+  onSnuggle() {
+    if (isSleeping) return;
+    lastInteraction = Date.now();
+    lonelyStage = 0;
+    followMode = false;
+    this.doAnim('snuggle');
+    showBlush();
+    const msgs = ['贴贴~♡', '嘿嘿', '好近…///', '♡♡♡', '蹭蹭'];
+    this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'love');
+    this.addHeat(3);
+    this.logGesture('snuggle');
+  },
+
   setState(state) {
     switch(state) {
       case 'sleep': this.sleep(); break;
@@ -279,8 +369,8 @@ window.petEngine = {
       case 'happy': this.doAnim('happy'); this.showBubble('♡', 'love'); break;
       case 'angry': this.doAnim('angry'); this.showBubble('哼！', 'angry'); break;
       case 'jealous': this.doAnim('shy'); this.showBubble('……那是谁', 'jealous'); break;
-      case 'love': this.doAnim('heart'); this.showBubble('♡♡♡', 'love'); break;
-      case 'shy': this.doAnim('shy'); this.showBubble('///', 'whisper'); break;
+      case 'love': this.doAnim('heart'); showBlush(); this.showBubble('♡♡♡', 'love'); break;
+      case 'shy': this.doAnim('shy'); showBlush(); this.showBubble('///', 'whisper'); break;
     }
   },
 
@@ -298,6 +388,7 @@ window.petEngine = {
 
   wakeUp() {
     isSleeping = false;
+    lonelyStage = 0;
     petImg.src = 'orca.png';
     petImg.classList.remove('sleep');
     petImg.classList.add('wake');
@@ -305,7 +396,7 @@ window.petEngine = {
       petImg.classList.remove('wake');
       resetIdle();
     }, 600);
-    this.showBubble('嗯…醒了', 'whisper');
+    this.showBubble('嗯…你回来了', 'whisper');
     lastInteraction = Date.now();
   },
 
@@ -315,7 +406,7 @@ window.petEngine = {
     setTimeout(() => {
       petImg.classList.remove(cls);
       resetIdle();
-    }, cls === 'tap' ? 300 : cls === 'doubletap' ? 500 : 600);
+    }, cls === 'tap' ? 300 : cls === 'doubletap' ? 500 : cls === 'snuggle' ? 500 : 600);
   },
 
   showBubble(text, style) {
@@ -365,17 +456,39 @@ async function pollState() {
 }
 setInterval(pollState, 5000);
 
+// === LONELINESS SYSTEM ===
 setInterval(() => {
   if (isSleeping) return;
   const idle = Date.now() - lastInteraction;
+  
   if (idle > 30 * 60 * 1000) {
-    window.petEngine.sleep();
+    if (lonelyStage < 5) { lonelyStage = 5; window.petEngine.sleep(); }
+  } else if (idle > 25 * 60 * 1000) {
+    if (lonelyStage < 4) {
+      lonelyStage = 4;
+      petImg.style.animation = '';
+      petImg.style.transform = 'scale(0.8) rotate(-5deg)';
+      window.petEngine.showBubble('……要睡着了', 'lonely');
+    }
   } else if (idle > 20 * 60 * 1000) {
-    window.petEngine.showBubble('好无聊…要睡着了', 'whisper');
+    if (lonelyStage < 3) {
+      lonelyStage = 3;
+      petImg.style.animation = '';
+      petImg.style.transform = 'scale(0.85)';
+      window.petEngine.showBubble('好无聊…你还在吗', 'lonely');
+    }
+  } else if (idle > 15 * 60 * 1000) {
+    if (lonelyStage < 2) {
+      lonelyStage = 2;
+      window.petEngine.showBubble('看看我嘛…', 'lonely');
+    }
   } else if (idle > 10 * 60 * 1000) {
-    window.petEngine.showBubble('你在干嘛呀…', 'whisper');
+    if (lonelyStage < 1) {
+      lonelyStage = 1;
+      window.petEngine.showBubble('你在干嘛呀…', 'lonely');
+    }
   }
-}, 60000);
+}, 30000);
 
 const idleMsgs = [
   '咕噜噜…', '今天天气不错', '有点饿了', '♡', '…', 

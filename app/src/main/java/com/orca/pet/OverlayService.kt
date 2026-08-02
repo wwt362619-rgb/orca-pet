@@ -1,5 +1,4 @@
 package com.orca.pet
-
 import android.app.*
 import android.content.Context
 import android.content.Intent
@@ -15,10 +14,10 @@ import android.webkit.WebSettings
 import androidx.core.app.NotificationCompat
 
 class OverlayService : Service() {
-
     private var windowManager: WindowManager? = null
     private var overlayView: WebView? = null
     private var params: WindowManager.LayoutParams? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     companion object {
         private const val CHANNEL_ID = "orca_pet_channel"
@@ -38,7 +37,6 @@ class OverlayService : Service() {
 
     private fun setupOverlay() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-
         params = WindowManager.LayoutParams(
             dpToPx(PET_SIZE_DP),
             dpToPx(PET_HEIGHT_DP),
@@ -53,7 +51,6 @@ class OverlayService : Service() {
             x = 50
             y = 300
         }
-
         overlayView = WebView(this).apply {
             setBackgroundColor(0x00000000)
             settings.apply {
@@ -66,7 +63,6 @@ class OverlayService : Service() {
             loadUrl("file:///android_asset/pet.html")
             setOnTouchListener(createTouchListener())
         }
-
         windowManager?.addView(overlayView, params)
     }
 
@@ -81,6 +77,12 @@ class OverlayService : Service() {
     private var flingVelocityX = 0f
     private var lastMoveX = 0f
     private var lastMoveTime = 0L
+    private var isFollowing = false
+    private var followStartX = 0
+    private var followStartY = 0
+    private var followTouchStartX = 0f
+    private var followTouchStartY = 0f
+    private var followMoveCount = 0
 
     private fun createTouchListener(): View.OnTouchListener {
         return View.OnTouchListener { _, event ->
@@ -95,6 +97,8 @@ class OverlayService : Service() {
                     flingVelocityX = 0f
                     lastMoveX = event.rawX
                     lastMoveTime = touchStartTime
+                    isFollowing = false
+                    followMoveCount = 0
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -112,11 +116,36 @@ class OverlayService : Service() {
                     }
                     lastMoveX = event.rawX
                     lastMoveTime = now
+
+                    // Follow mode: if finger stays near pet after drag, trigger follow
+                    followMoveCount++
+                    if (followMoveCount > 30 && !isFollowing) {
+                        isFollowing = true
+                        followStartX = params?.x ?: 0
+                        followStartY = params?.y ?: 0
+                        followTouchStartX = event.rawX
+                        followTouchStartY = event.rawY
+                        overlayView?.evaluateJavascript(
+                            "window.petEngine && window.petEngine.onFollow(${event.rawX}, ${event.rawY})", null
+                        )
+                    }
+                    if (isFollowing) {
+                        val fdx = (event.rawX - followTouchStartX).toInt()
+                        val fdy = (event.rawY - followTouchStartY).toInt()
+                        params?.x = followStartX + fdx
+                        params?.y = followStartY + fdy
+                        windowManager?.updateViewLayout(overlayView, params)
+                    }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
                     val elapsed = System.currentTimeMillis() - touchStartTime
-                    if (hasMoved && Math.abs(flingVelocityX) > 800) {
+                    if (isFollowing && elapsed > 1500) {
+                        // Long follow = snuggle
+                        overlayView?.evaluateJavascript(
+                            "window.petEngine && window.petEngine.onSnuggle()", null
+                        )
+                    } else if (hasMoved && Math.abs(flingVelocityX) > 800) {
                         val direction = if (flingVelocityX > 0) "right" else "left"
                         overlayView?.evaluateJavascript(
                             "window.petEngine && window.petEngine.onFling('$direction')", null
@@ -131,6 +160,8 @@ class OverlayService : Service() {
                             }
                         }
                     }
+                    isFollowing = false
+                    followMoveCount = 0
                     true
                 }
                 else -> false
@@ -143,13 +174,11 @@ class OverlayService : Service() {
             "window.petEngine && window.petEngine.onTap()", null
         )
     }
-
     private fun onDoubleTap() {
         overlayView?.evaluateJavascript(
             "window.petEngine && window.petEngine.onDoubleTap()", null
         )
     }
-
     private fun onLongPress() {
         overlayView?.evaluateJavascript(
             "window.petEngine && window.petEngine.onLongPress()", null
@@ -165,7 +194,6 @@ class OverlayService : Service() {
         "凌晨了…该睡了", "早上好呀", "午饭时间到",
         "下午茶时间~", "傍晚了", "夜深了…"
     )
-
     private fun buildNotification(text: String): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
@@ -182,12 +210,6 @@ class OverlayService : Service() {
             .build()
     }
 
-    private fun updateNotificationWhisper() {
-        val msg = whisperMessages[(System.currentTimeMillis() / 3600000 % whisperMessages.size).toInt()]
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(NOTIFICATION_ID, buildNotification(msg))
-    }
-
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -200,7 +222,6 @@ class OverlayService : Service() {
         }
     }
 
-    // === UTILS ===
     private fun dpToPx(dp: Int): Int {
         return (dp * resources.displayMetrics.density).toInt()
     }
