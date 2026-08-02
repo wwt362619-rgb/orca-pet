@@ -19,9 +19,7 @@ import androidx.core.app.NotificationCompat
 class OverlayService : Service() {
     private var windowManager: WindowManager? = null
     private var overlayView: WebView? = null
-    private var touchOverlay: View? = null
     private var params: WindowManager.LayoutParams? = null
-    private var touchParams: WindowManager.LayoutParams? = null
     private val handler = Handler(Looper.getMainLooper())
     private var receiver: BroadcastReceiver? = null
 
@@ -38,142 +36,8 @@ class OverlayService : Service() {
         super.onCreate()
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("嗷~"))
-        setupTouchOverlay()
         setupOverlay()
         setupBroadcastReceiver()
-    }
-
-    private fun setupTouchOverlay() {
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        touchParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = 0
-            y = 0
-        }
-
-        touchOverlay = object : View(this) {
-            override fun onTouchEvent(event: MotionEvent): Boolean {
-                handleGlobalTouch(event)
-                return false
-            }
-        }.apply {
-            setBackgroundColor(0x00000000)
-        }
-        windowManager?.addView(touchOverlay, touchParams)
-    }
-
-    // === GLOBAL TOUCH HANDLING ===
-    private var globalTouchStartTime = 0L
-    private var globalTouchStartX = 0f
-    private var globalTouchStartY = 0f
-    private var globalTouchMoved = false
-    private var globalLongPressTriggered = false
-    private var globalTouchMoveCount = 0
-    private var globalLastMoveX = 0f
-    private var globalLastMoveY = 0f
-    private var globalLastMoveTime = 0L
-
-    private fun handleGlobalTouch(event: MotionEvent) {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                globalTouchStartTime = System.currentTimeMillis()
-                globalTouchStartX = event.rawX
-                globalTouchStartY = event.rawY
-                globalTouchMoved = false
-                globalLongPressTriggered = false
-                globalTouchMoveCount = 0
-                globalLastMoveX = event.rawX
-                globalLastMoveY = event.rawY
-                globalLastMoveTime = globalTouchStartTime
-
-                // Schedule long press check
-                handler.postDelayed({
-                    if (!globalTouchMoved && !globalLongPressTriggered) {
-                        globalLongPressTriggered = true
-                        onGlobalLongPress(event.rawX, event.rawY)
-                    }
-                }, 500)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val dx = Math.abs(event.rawX - globalTouchStartX)
-                val dy = Math.abs(event.rawY - globalTouchStartY)
-                if (dx > 8 || dy > 8) {
-                    globalTouchMoved = true
-                }
-                globalTouchMoveCount++
-                globalLastMoveX = event.rawX
-                globalLastMoveY = event.rawY
-                globalLastMoveTime = System.currentTimeMillis()
-
-                // Pet follows finger movement smoothly
-                if (globalTouchMoveCount % 3 == 0) {
-                    onGlobalSwipeFollow(event.rawX, event.rawY)
-                }
-            }
-            MotionEvent.ACTION_UP -> {
-                if (!globalTouchMoved && !globalLongPressTriggered) {
-                    // It was a tap somewhere on screen
-                    onGlobalTap(event.rawX, event.rawY)
-                }
-                if (globalTouchMoved && !globalLongPressTriggered) {
-                    onGlobalSwipeEnd(event.rawX, event.rawY)
-                }
-            }
-        }
-    }
-
-    private fun onGlobalLongPress(x: Float, y: Float) {
-        // Move pet slowly to the long press location
-        val targetX = x.toInt() - dpToPx(PET_SIZE_DP) / 2
-        val targetY = y.toInt() - dpToPx(PET_HEIGHT_DP) / 2
-        animatePetTo(targetX, targetY, "screen_longpress")
-    }
-
-    private fun onGlobalSwipeFollow(x: Float, y: Float) {
-        // Pet slowly drifts toward where finger is
-        val currentX = params?.x ?: 50
-        val currentY = params?.y ?: 300
-        val targetX = x.toInt() - dpToPx(PET_SIZE_DP) / 2
-        val targetY = y.toInt() - dpToPx(PET_HEIGHT_DP) / 2
-
-        // Smooth follow: move 25% of the way each step
-        val newX = currentX + ((targetX - currentX) * 0.25f).toInt()
-        val newY = currentY + ((targetY - currentY) * 0.25f).toInt()
-
-        params?.x = newX
-        params?.y = newY
-        windowManager?.updateViewLayout(overlayView, params)
-
-        // Tell pet to show follow animation
-        if (Math.abs(targetX - currentX) > 50 || Math.abs(targetY - currentY) > 50) {
-            overlayView?.evaluateJavascript(
-                "window.petEngine && window.petEngine.onFollow(${x}, ${y})", null
-            )
-        }
-    }
-
-    private fun onGlobalSwipeEnd(x: Float, y: Float) {
-        // Pet stops following, maybe says something
-        overlayView?.evaluateJavascript(
-            "window.petEngine && window.petEngine.setState('curious')", null
-        )
-    }
-
-    private fun onGlobalTap(x: Float, y: Float) {
-        // User tapped somewhere on screen - pet notices
-        overlayView?.evaluateJavascript(
-            "window.petEngine && window.petEngine.setState('curious')", null
-        )
     }
 
     private fun setupBroadcastReceiver() {
@@ -416,13 +280,11 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         receiver?.let { unregisterReceiver(it) }
-        touchOverlay?.let { windowManager?.removeView(it) }
         overlayView?.let {
             windowManager?.removeView(it)
             it.destroy()
         }
         overlayView = null
-        touchOverlay = null
         super.onDestroy()
     }
 }
