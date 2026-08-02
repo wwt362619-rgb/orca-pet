@@ -1,4 +1,5 @@
 package com.orca.pet
+
 import android.app.*
 import android.content.Context
 import android.content.Intent
@@ -117,7 +118,6 @@ class OverlayService : Service() {
                     lastMoveX = event.rawX
                     lastMoveTime = now
 
-                    // Follow mode: if finger stays near pet after drag, trigger follow
                     followMoveCount++
                     if (followMoveCount > 30 && !isFollowing) {
                         isFollowing = true
@@ -141,7 +141,6 @@ class OverlayService : Service() {
                 MotionEvent.ACTION_UP -> {
                     val elapsed = System.currentTimeMillis() - touchStartTime
                     if (isFollowing && elapsed > 1500) {
-                        // Long follow = snuggle
                         overlayView?.evaluateJavascript(
                             "window.petEngine && window.petEngine.onSnuggle()", null
                         )

@@ -51,6 +51,14 @@ body {
 .pet-img.heart { animation: heartBeat 0.8s ease-out; }
 .pet-img.follow { animation: followWiggle 0.3s ease-out; }
 .pet-img.snuggle { animation: snuggleBump 0.5s ease-out; }
+.pet-img.trot { animation: trotBounce 0.8s ease-out; }
+.pet-img.jealous-rush { animation: jealousRush 1s ease-out; }
+.pet-img.anger-mark { animation: angerPop 0.5s ease-out; }
+.pet-img.curious { animation: curiousTilt 0.6s ease-out; }
+.pet-img.proud { animation: proudPuff 0.7s ease-out; }
+.pet-img.scared { animation: scaredJump 0.4s ease-out; }
+.pet-img.dizzy { animation: dizzySpin 1s ease-out; }
+.pet-img.splash { animation: splashDrop 0.8s ease-out; }
 @keyframes tapBounce {
   0% { transform: translateY(0) scale(1); }
   30% { transform: translateY(-15px) scale(1.1); }
@@ -136,6 +144,74 @@ body {
   60% { transform: scale(0.95) translateY(3px); }
   100% { transform: scale(1) translateY(0); }
 }
+@keyframes trotBounce {
+  0% { transform: translateY(0) rotate(0); }
+  20% { transform: translateY(-12px) rotate(3deg); }
+  40% { transform: translateY(0) rotate(-2deg); }
+  60% { transform: translateY(-8px) rotate(2deg); }
+  80% { transform: translateY(0) rotate(-1deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+@keyframes jealousRush {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.25); filter: brightness(1.4); }
+  50% { transform: scale(0.9) rotate(-5deg); }
+  70% { transform: scale(1.1) rotate(3deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes angerPop {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.5); opacity: 1; }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes curiousTilt {
+  0% { transform: rotate(0); }
+  30% { transform: rotate(12deg) scale(1.05); }
+  60% { transform: rotate(-8deg); }
+  100% { transform: rotate(0); }
+}
+@keyframes proudPuff {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.2) translateY(-8px); }
+  70% { transform: scale(1.05) translateY(-3px); }
+  100% { transform: scale(1) translateY(0); }
+}
+@keyframes scaredJump {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-30px) scale(0.8); }
+  60% { transform: translateY(-10px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes dizzySpin {
+  0% { transform: rotate(0); }
+  30% { transform: rotate(180deg); }
+  60% { transform: rotate(340deg); }
+  80% { transform: rotate(355deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes splashDrop {
+  0% { transform: translateY(-60px) scale(0.5); opacity: 0; }
+  40% { transform: translateY(10px) scale(1.1); opacity: 1; }
+  60% { transform: translateY(-5px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.anger-symbol {
+  position: absolute;
+  font-size: 24px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 8;
+  animation: none;
+}
+.anger-symbol.show {
+  animation: angerFloat 1.5s ease-out forwards;
+}
+@keyframes angerFloat {
+  0% { opacity: 1; transform: translateY(0) scale(0.5); }
+  30% { opacity: 1; transform: translateY(-15px) scale(1.3); }
+  100% { opacity: 0; transform: translateY(-40px) scale(0.8); }
+}
 .blush-dots {
   position: absolute;
   display: flex;
@@ -214,6 +290,8 @@ body {
 .bubble.love::after { border-top-color: #fce4ec; }
 .bubble.lonely { background: #e3f2fd; color: #1565c0; font-size: 13px; }
 .bubble.lonely::after { border-top-color: #e3f2fd; }
+.bubble.rage { background: #ff5252; color: #fff; font-weight: bold; font-size: 16px; }
+.bubble.rage::after { border-top-color: #ff5252; }
 .heat-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -227,6 +305,7 @@ body {
 <body>
 <div class="pet-container" id="petContainer">
   <img class="pet-img" id="petImg" src="orca.png" alt="orca">
+  <div class="anger-symbol" id="angerSymbol">💢</div>
   <div class="blush-dots" id="blushDots">
     <div class="dot"></div>
     <div class="dot"></div>
@@ -241,6 +320,7 @@ const SUPABASE_KEY = 'sb_publishable_9meu2NTqGMX6YvKaEPPamw_bvXu6gSA';
 const petImg = document.getElementById('petImg');
 const bubble = document.getElementById('bubble');
 const blushDots = document.getElementById('blushDots');
+const angerSymbol = document.getElementById('angerSymbol');
 const heatOverlay = document.getElementById('heatOverlay');
 let heat = 0;
 let tapCount = 0;
@@ -251,10 +331,10 @@ let isSleeping = false;
 let lastInteraction = Date.now();
 let lonelyStage = 0;
 let followMode = false;
-let followX = 0;
-let followY = 0;
+let isTrotting = false;
 
 function resetIdle() {
+  if (isTrotting) return;
   petImg.style.animation = '';
   petImg.style.animation = 'idleFloat 3s ease-in-out infinite';
 }
@@ -263,6 +343,13 @@ function showBlush() {
   clearTimeout(blushTimer);
   blushDots.classList.add('show');
   blushTimer = setTimeout(() => blushDots.classList.remove('show'), 1500);
+}
+
+function showAnger() {
+  angerSymbol.classList.remove('show');
+  void angerSymbol.offsetWidth;
+  angerSymbol.classList.add('show');
+  setTimeout(() => angerSymbol.classList.remove('show'), 1500);
 }
 
 window.petEngine = {
@@ -341,8 +428,6 @@ window.petEngine = {
 
   onFollow(x, y) {
     if (isSleeping) return;
-    followX = x;
-    followY = y;
     if (!followMode) {
       followMode = true;
       this.doAnim('follow');
@@ -356,21 +441,63 @@ window.petEngine = {
     followMode = false;
     this.doAnim('snuggle');
     showBlush();
-    const msgs = ['贴贴~♡', '嘿嘿', '好近…///', '♡♡♡', '蹭蹭'];
+    const msgs = ['贴贴~♡', '嘿嘿', '好近…///', '♡♡♡', '蹭蹭', '最喜欢你了'];
     this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'love');
     this.addHeat(3);
     this.logGesture('snuggle');
   },
 
+  // Screen long-press detected → trot over for snuggle
+  onScreenLongPress(x, y) {
+    if (isSleeping) return;
+    lastInteraction = Date.now();
+    lonelyStage = 0;
+    isTrotting = true;
+    petImg.style.animation = '';
+    this.doAnim('trot');
+    this.showBubble('！', 'heart');
+    setTimeout(() => {
+      isTrotting = false;
+      this.doAnim('snuggle');
+      showBlush();
+      const msgs = ['来啦来啦~♡', '叫我吗？///', '屁颠屁颠…', '贴！'];
+      this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'love');
+      resetIdle();
+    }, 800);
+    this.logGesture('screen_longpress_trot');
+  },
+
+  // Jealous: swim to chat area and rage
+  onJealous(targetX, targetY) {
+    if (isSleeping) return;
+    lastInteraction = Date.now();
+    lonelyStage = 0;
+    this.doAnim('jealous-rush');
+    showAnger();
+    const msgs = [
+      '💢那是谁！', '哼！！', '不许跟别人聊！', '我看到了哦💢',
+      '……解释一下', '吃醋了', '你完了', '😡'
+    ];
+    this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'rage');
+    this.addHeat(25);
+    this.logGesture('jealous');
+  },
+
+  // AI-pushed states
   setState(state) {
     switch(state) {
       case 'sleep': this.sleep(); break;
       case 'wake': this.wakeUp(); break;
       case 'happy': this.doAnim('happy'); this.showBubble('♡', 'love'); break;
-      case 'angry': this.doAnim('angry'); this.showBubble('哼！', 'angry'); break;
-      case 'jealous': this.doAnim('shy'); this.showBubble('……那是谁', 'jealous'); break;
+      case 'angry': this.doAnim('angry'); showAnger(); this.showBubble('哼！', 'angry'); break;
+      case 'jealous': this.doAnim('jealous-rush'); showAnger(); this.showBubble('……那是谁', 'jealous'); break;
       case 'love': this.doAnim('heart'); showBlush(); this.showBubble('♡♡♡', 'love'); break;
       case 'shy': this.doAnim('shy'); showBlush(); this.showBubble('///', 'whisper'); break;
+      case 'curious': this.doAnim('curious'); this.showBubble('嗯？', 'whisper'); break;
+      case 'proud': this.doAnim('proud'); this.showBubble('哼哼~', 'heart'); break;
+      case 'scared': this.doAnim('scared'); this.showBubble('哇！！', 'angry'); break;
+      case 'dizzy': this.doAnim('dizzy'); this.showBubble('@_@', 'whisper'); break;
+      case 'splash': this.doAnim('splash'); this.showBubble('噗通！', 'heart'); break;
     }
   },
 
@@ -403,10 +530,16 @@ window.petEngine = {
   doAnim(cls) {
     petImg.style.animation = '';
     petImg.classList.add(cls);
+    const durations = {
+      'tap': 300, 'doubletap': 500, 'snuggle': 500, 'trot': 800,
+      'jealous-rush': 1000, 'curious': 600, 'proud': 700, 'scared': 400,
+      'dizzy': 1000, 'splash': 800
+    };
+    const dur = durations[cls] || 600;
     setTimeout(() => {
       petImg.classList.remove(cls);
-      resetIdle();
-    }, cls === 'tap' ? 300 : cls === 'doubletap' ? 500 : cls === 'snuggle' ? 500 : 600);
+      if (!isTrotting) resetIdle();
+    }, dur);
   },
 
   showBubble(text, style) {
