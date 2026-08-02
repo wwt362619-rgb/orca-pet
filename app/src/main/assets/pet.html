@@ -59,6 +59,15 @@ body {
 .pet-img.scared { animation: scaredJump 0.4s ease-out; }
 .pet-img.dizzy { animation: dizzySpin 1s ease-out; }
 .pet-img.splash { animation: splashDrop 0.8s ease-out; }
+.pet-img.flip { animation: backflip 0.8s ease-out; }
+.pet-img.wiggle { animation: wiggleDance 0.7s ease-out; }
+.pet-img.pop { animation: popSurprise 0.5s ease-out; }
+.pet-img.slide { animation: slideIn 0.6s ease-out; }
+.pet-img.bounce-loop { animation: bounceLoop 0.4s ease-in-out 3; }
+.pet-img.sparkle { animation: sparkleGlow 0.8s ease-out; }
+.pet-img.melt { animation: meltDown 1s ease-out; }
+.pet-img.peek { animation: peekABoo 0.7s ease-out; }
+.pet-img.rainbow { animation: rainbowFlash 1.2s ease-out; }
 @keyframes tapBounce {
   0% { transform: translateY(0) scale(1); }
   30% { transform: translateY(-15px) scale(1.1); }
@@ -190,11 +199,70 @@ body {
   80% { transform: rotate(355deg); }
   100% { transform: rotate(360deg); }
 }
+@keyframes backflip {
+  0% { transform: rotate(0) scale(1); }
+  50% { transform: rotate(-180deg) scale(0.7) translateY(-20px); }
+  100% { transform: rotate(-360deg) scale(1) translateY(0); }
+}
+@keyframes wiggleDance {
+  0% { transform: rotate(0) translateX(0); }
+  25% { transform: rotate(-10deg) translateX(-5px); }
+  50% { transform: rotate(10deg) translateX(5px); }
+  75% { transform: rotate(-5deg) translateX(-3px); }
+  100% { transform: rotate(0) translateX(0); }
+}
+@keyframes popSurprise {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.3); opacity: 1; }
+  80% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+@keyframes slideIn {
+  0% { transform: translateX(-60px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes bounceLoop {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+@keyframes sparkleGlow {
+  0% { filter: brightness(1) drop-shadow(0 0 0 gold); }
+  50% { filter: brightness(1.5) drop-shadow(0 0 10px gold); }
+  100% { filter: brightness(1) drop-shadow(0 0 0 gold); }
+}
+@keyframes meltDown {
+  0% { transform: scale(1,1) translateY(0); }
+  50% { transform: scale(1.3,0.6) translateY(15px); }
+  100% { transform: scale(1,1) translateY(0); }
+}
+@keyframes peekABoo {
+  0% { transform: translateY(30px) scale(0.6); opacity: 0; }
+  40% { transform: translateY(-10px) scale(1.05); opacity: 1; }
+  70% { transform: translateY(5px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes rainbowFlash {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
 @keyframes splashDrop {
   0% { transform: translateY(-60px) scale(0.5); opacity: 0; }
   40% { transform: translateY(10px) scale(1.1); opacity: 1; }
   60% { transform: translateY(-5px) scale(0.95); }
   100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.sparkle-particles {
+  position: absolute;
+  pointer-events: none;
+  z-index: 6;
+}
+.sparkle-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: gold;
+  animation: particleBurst 0.8s ease-out forwards;
 }
 .anger-symbol {
   position: absolute;
@@ -238,6 +306,10 @@ body {
   0% { transform: scale(0); }
   50% { transform: scale(1.3); }
   100% { transform: scale(1); }
+}
+@keyframes particleBurst {
+  0% { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
 }
 @keyframes dotFloat {
   0% { transform: translateY(0); opacity: 1; }
@@ -292,6 +364,8 @@ body {
 .bubble.lonely::after { border-top-color: #e3f2fd; }
 .bubble.rage { background: #ff5252; color: #fff; font-weight: bold; font-size: 16px; }
 .bubble.rage::after { border-top-color: #ff5252; }
+.bubble.surprise { background: #fff9c4; color: #f57f17; font-weight: bold; font-size: 15px; }
+.bubble.surprise::after { border-top-color: #fff9c4; }
 .heat-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -305,6 +379,7 @@ body {
 <body>
 <div class="pet-container" id="petContainer">
   <img class="pet-img" id="petImg" src="orca.png" alt="orca">
+  <div class="sparkle-particles" id="sparkleParticles"></div>
   <div class="anger-symbol" id="angerSymbol">💢</div>
   <div class="blush-dots" id="blushDots">
     <div class="dot"></div>
@@ -343,6 +418,23 @@ function showBlush() {
   clearTimeout(blushTimer);
   blushDots.classList.add('show');
   blushTimer = setTimeout(() => blushDots.classList.remove('show'), 1500);
+}
+
+function spawnSparkles() {
+  const container = document.getElementById('sparkleParticles');
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const p = document.createElement('div');
+    p.style.cssText = `
+      position:absolute;width:4px;height:4px;border-radius:50%;background:gold;
+      left:${40+Math.random()*20}%;top:${30+Math.random()*30}%;
+      animation:particleBurst 0.8s ease-out ${Math.random()*0.2}s forwards;
+      --tx:${(Math.random()*60-30)}px;--ty:${(Math.random()*-50-10)}px;
+    `;
+    container.appendChild(p);
+  }
+  setTimeout(() => { container.innerHTML = ''; }, 1000);
 }
 
 function showAnger() {
@@ -448,6 +540,13 @@ window.petEngine = {
   },
 
   // Screen long-press detected → trot over for snuggle
+  startTrot() {
+    if (isSleeping) return;
+    isTrotting = true;
+    petImg.style.animation = '';
+    this.doAnim('trot');
+  },
+
   onScreenLongPress(x, y) {
     if (isSleeping) return;
     lastInteraction = Date.now();
@@ -460,7 +559,7 @@ window.petEngine = {
       isTrotting = false;
       this.doAnim('snuggle');
       showBlush();
-      const msgs = ['来啦来啦~♡', '叫我吗？///', '屁颠屁颠…', '贴！'];
+      const msgs = ['来啦~♡', '叫我吗？///', '贴！', '嘿嘿', '♡'];
       this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'love');
       resetIdle();
     }, 800);
@@ -498,6 +597,15 @@ window.petEngine = {
       case 'scared': this.doAnim('scared'); this.showBubble('哇！！', 'angry'); break;
       case 'dizzy': this.doAnim('dizzy'); this.showBubble('@_@', 'whisper'); break;
       case 'splash': this.doAnim('splash'); this.showBubble('噗通！', 'heart'); break;
+      case 'flip': this.doAnim('flip'); spawnSparkles(); this.showBubble('芜湖~', 'surprise'); break;
+      case 'wiggle': this.doAnim('wiggle'); this.showBubble('♪', 'heart'); break;
+      case 'pop': this.doAnim('pop'); spawnSparkles(); this.showBubble('锵锵！', 'surprise'); break;
+      case 'slide': this.doAnim('slide'); this.showBubble('溜~', 'whisper'); break;
+      case 'bounce': this.doAnim('bounce-loop'); this.showBubble('嘿嘿嘿', 'heart'); break;
+      case 'sparkle': this.doAnim('sparkle'); spawnSparkles(); this.showBubble('✨', 'surprise'); break;
+      case 'melt': this.doAnim('melt'); this.showBubble('融化了…', 'whisper'); break;
+      case 'peek': this.doAnim('peek'); this.showBubble('嘿！', 'surprise'); break;
+      case 'rainbow': this.doAnim('rainbow'); spawnSparkles(); this.showBubble('🌈', 'surprise'); break;
     }
   },
 
@@ -533,7 +641,7 @@ window.petEngine = {
     const durations = {
       'tap': 300, 'doubletap': 500, 'snuggle': 500, 'trot': 800,
       'jealous-rush': 1000, 'curious': 600, 'proud': 700, 'scared': 400,
-      'dizzy': 1000, 'splash': 800
+      'dizzy': 1000, 'splash': 800, 'flip': 800, 'wiggle': 700, 'pop': 500, 'slide': 600, 'bounce-loop': 1200, 'sparkle': 800, 'melt': 1000, 'peek': 700, 'rainbow': 1200
     };
     const dur = durations[cls] || 600;
     setTimeout(() => {
