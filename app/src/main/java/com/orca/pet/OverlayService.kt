@@ -112,6 +112,7 @@ class OverlayService : Service() {
     }
 
     private fun setupOverlay() {
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         params = WindowManager.LayoutParams(
             dpToPx(PET_SIZE_DP),
             dpToPx(PET_HEIGHT_DP),
