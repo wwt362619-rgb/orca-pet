@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: transparent;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pet-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pet-img {
+  width: 100%;
+  height: auto;
+  image-rendering: auto;
+  transition: transform 0.15s ease-out;
+  pointer-events: none;
+}
+.pet-img.tap { transform: scale(1.15); }
+.pet-img.doubletap { transform: scale(1.3) rotate(-5deg); }
+.pet-img.longpress { transform: scale(0.85); filter: brightness(1.3); }
+.pet-img.fling-left { animation: flingLeft 0.8s ease-out forwards; }
+.pet-img.fling-right { animation: flingRight 0.8s ease-out forwards; }
+.pet-img.crawl-back-left { animation: crawlBackLeft 1.5s ease-in-out forwards; }
+.pet-img.crawl-back-right { animation: crawlBackRight 1.5s ease-in-out forwards; }
+.pet-img.sleep { animation: sleepFloat 4s ease-in-out infinite; }
+.pet-img.wake { animation: wakeUp 0.6s ease-out; }
+
+@keyframes flingLeft {
+  0% { transform: translateX(0) rotate(0); opacity: 1; }
+  100% { transform: translateX(-200px) rotate(-30deg); opacity: 0; }
+}
+@keyframes flingRight {
+  0% { transform: translateX(0) rotate(0); opacity: 1; }
+  100% { transform: translateX(200px) rotate(30deg); opacity: 0; }
+}
+@keyframes crawlBackLeft {
+  0% { transform: translateX(-200px) rotate(-30deg); opacity: 0; }
+  60% { transform: translateX(-30px) rotate(5deg); opacity: 1; }
+  100% { transform: translateX(0) rotate(0); opacity: 1; }
+}
+@keyframes crawlBackRight {
+  0% { transform: translateX(200px) rotate(30deg); opacity: 0; }
+  60% { transform: translateX(30px) rotate(-5deg); opacity: 1; }
+  100% { transform: translateX(0) rotate(0); opacity: 1; }
+}
+@keyframes sleepFloat {
+  0%,100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.03); }
+}
+@keyframes wakeUp {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.bubble {
+  position: absolute;
+  background: rgba(255,255,255,0.92);
+  border-radius: 16px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #333;
+  max-width: 200px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+  font-family: sans-serif;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.bubble.show {
+  opacity: 1;
+  transform: translateY(-10px);
+}
+.bubble.heart { background: #ffe0e6; color: #c0392b; }
+.bubble.angry { background: #ffe0e0; color: #c0392b; font-weight: bold; }
+.bubble.whisper { background: #e8e8e8; color: #666; font-size: 11px; }
+.bubble.jealous { background: #e0ffe0; color: #27ae60; }
+
+.heat-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,0,0,0);
+  pointer-events: none;
+  transition: background 1s;
+  border-radius: 50%;
+}
+</style>
+</head>
+<body>
+<div class="pet-container" id="petContainer">
+  <img class="pet-img" id="petImg" src="orca.png" alt="orca">
+  <div class="bubble" id="bubble"></div>
+</div>
+<div class="heat-overlay" id="heatOverlay"></div>
+
+<script>
+const SUPABASE_URL = 'https://xqsfkbvyrfvrtwqzusth.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9meu2NTqGMX6YvKaEPPamw_bvXu6gSA';
+
+const petImg = document.getElementById('petImg');
+const bubble = document.getElementById('bubble');
+const heatOverlay = document.getElementById('heatOverlay');
+
+let heat = 0;
+let tapCount = 0;
+let tapTimer = null;
+let bubbleTimer = null;
+let isSleeping = false;
+let lastInteraction = Date.now();
+
+// === Pet Engine (called from Kotlin) ===
+window.petEngine = {
+  onTap() {
+    if (isSleeping) { this.wakeUp(); return; }
+    lastInteraction = Date.now();
+    tapCount++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => { tapCount = 0; }, 2000);
+    
+    if (tapCount >= 8) {
+      this.doAnimation('longpress');
+      this.showBubble('戳够了没！！(╯°□°)╯', 'angry');
+      this.addHeat(15);
+      tapCount = 0;
+    } else if (tapCount >= 5) {
+      this.doAnimation('doubletap');
+      this.showBubble('啊啊啊别戳了！', 'angry');
+      this.addHeat(10);
+    } else if (tapCount >= 3) {
+      this.doAnimation('doubletap');
+      this.showBubble('干嘛啦~', 'heart');
+      this.addHeat(5);
+    } else {
+      this.doAnimation('tap');
+      const msgs = ['嗯？', '嘻嘻', '嗷~', '？', '♡', '…', '哼', '诶嘿'];
+      this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'heart');
+      this.addHeat(2);
+    }
+    this.logGesture('tap');
+  },
+
+  onDoubleTap() {
+    if (isSleeping) { this.wakeUp(); return; }
+    lastInteraction = Date.now();
+    this.doAnimation('doubletap');
+    this.showBubble('！！！', 'angry');
+    this.addHeat(8);
+    this.logGesture('double_tap');
+  },
+
+  onLongPress() {
+    if (isSleeping) { this.wakeUp(); return; }
+    lastInteraction = Date.now();
+    this.doAnimation('longpress');
+    const msgs = ['……放手', '好痛', '你在干嘛', '不要这样'];
+    this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'whisper');
+    this.addHeat(12);
+    this.logGesture('long_press');
+  },
+
+  onFling(direction) {
+    if (isSleeping) return;
+    lastInteraction = Date.now();
+    const animClass = direction === 'left' ? 'fling-left' : 'fling-right';
+    const crawlClass = direction === 'left' ? 'crawl-back-left' : 'crawl-back-right';
+    petImg.classList.add(animClass);
+    this.showBubble('呜哇——', 'angry');
+    setTimeout(() => {
+      petImg.classList.remove(animClass);
+      petImg.classList.add(crawlClass);
+      setTimeout(() => petImg.classList.remove(crawlClass), 1500);
+    }, 800);
+    this.logGesture('fling_' + direction);
+  },
+
+  setState(state) {
+    switch(state) {
+      case 'sleep': this.sleep(); break;
+      case 'wake': this.wakeUp(); break;
+      case 'happy': this.showBubble('♡', 'heart'); break;
+      case 'angry': this.showBubble('哼！', 'angry'); break;
+      case 'jealous': this.showBubble('……那是谁', 'jealous'); break;
+    }
+  },
+
+  showMessage(text, style) {
+    this.showBubble(text, style || 'heart');
+  },
+
+  sleep() {
+    isSleeping = true;
+    petImg.src = 'orca_small.png';
+    petImg.classList.add('sleep');
+    this.showBubble('zzZ...', 'whisper');
+  },
+
+  wakeUp() {
+    isSleeping = false;
+    petImg.src = 'orca.png';
+    petImg.classList.remove('sleep');
+    petImg.classList.add('wake');
+    setTimeout(() => petImg.classList.remove('wake'), 600);
+    this.showBubble('嗯…醒了', 'whisper');
+    lastInteraction = Date.now();
+  },
+
+  doAnimation(cls) {
+    petImg.classList.add(cls);
+    setTimeout(() => petImg.classList.remove(cls), 200);
+  },
+
+  showBubble(text, style) {
+    clearTimeout(bubbleTimer);
+    bubble.textContent = text;
+    bubble.className = 'bubble ' + (style || '');
+    bubble.classList.add('show');
+    bubbleTimer = setTimeout(() => bubble.classList.remove('show'), 2500);
+  },
+
+  addHeat(amount) {
+    heat = Math.min(100, heat + amount);
+    heatOverlay.style.background = `rgba(255,0,0,${heat / 300})`;
+    setTimeout(() => {
+      heat = Math.max(0, heat - amount);
+      heatOverlay.style.background = `rgba(255,0,0,${heat / 300})`;
+    }, 30000);
+  },
+
+  logGesture(type) {
+    fetch(`${SUPABASE_URL}/rest/v1/gesture_log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ gesture_type: type })
+    }).catch(() => {});
+  }
+};
+
+// === Poll AI state ===
+async function pollState() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/pet_state?order=updated_at.desc&limit=1`, {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    const data = await res.json();
+    if (data.length > 0 && data[0].state_key) {
+      window.petEngine.setState(data[0].state_key);
+      if (data[0].state_value) {
+        window.petEngine.showMessage(data[0].state_value, 'heart');
+      }
+    }
+  } catch(e) {}
+}
+setInterval(pollState, 5000);
+
+// === Idle loneliness ===
+setInterval(() => {
+  if (isSleeping) return;
+  const idle = Date.now() - lastInteraction;
+  if (idle > 30 * 60 * 1000) {
+    window.petEngine.sleep();
+  } else if (idle > 20 * 60 * 1000) {
+    window.petEngine.showBubble('好无聊…要睡着了', 'whisper');
+  } else if (idle > 10 * 60 * 1000) {
+    window.petEngine.showBubble('你在干嘛呀…', 'whisper');
+  }
+}, 60000);
+
+// === Random idle mumbles ===
+const idleMsgs = [
+  '咕噜噜…', '今天天气不错', '有点饿了', '♡', '…', 
+  '好安静', '想出去玩', 'zzZ...唔', '诶？', '哼~'
+];
+setInterval(() => {
+  if (isSleeping) return;
+  if (Date.now() - lastInteraction < 60000) return;
+  if (Math.random() > 0.3) return;
+  const msg = idleMsgs[Math.floor(Math.random() * idleMsgs.length)];
+  window.petEngine.showBubble(msg, 'whisper');
+}, 45000);
+</script>
+</body>
+</html>
