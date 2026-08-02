@@ -1,8 +1,10 @@
 package com.orca.pet
 
 import android.app.*
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -19,6 +21,7 @@ class OverlayService : Service() {
     private var overlayView: WebView? = null
     private var params: WindowManager.LayoutParams? = null
     private val handler = Handler(Looper.getMainLooper())
+    private var receiver: BroadcastReceiver? = null
 
     companion object {
         private const val CHANNEL_ID = "orca_pet_channel"
@@ -34,6 +37,68 @@ class OverlayService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("嗷~"))
         setupOverlay()
+        setupBroadcastReceiver()
+    }
+
+    private fun setupBroadcastReceiver() {
+        receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    "com.orca.pet.MOVE_TO" -> {
+                        val x = intent.getIntExtra("x", params?.x ?: 50)
+                        val y = intent.getIntExtra("y", params?.y ?: 300)
+                        val action = intent.getStringExtra("action") ?: ""
+                        animatePetTo(x, y, action)
+                    }
+                    "com.orca.pet.SET_STATE" -> {
+                        val state = intent.getStringExtra("state") ?: ""
+                        val message = intent.getStringExtra("message") ?: ""
+                        overlayView?.evaluateJavascript(
+                            "window.petEngine && window.petEngine.setState('$state')", null
+                        )
+                        if (message.isNotEmpty()) {
+                            handler.postDelayed({
+                                overlayView?.evaluateJavascript(
+                                    "window.petEngine && window.petEngine.showMessage('$message', 'heart')", null
+                                )
+                            }, 400)
+                        }
+                    }
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction("com.orca.pet.MOVE_TO")
+            addAction("com.orca.pet.SET_STATE")
+        }
+        registerReceiver(receiver, filter)
+    }
+
+    private fun animatePetTo(targetX: Int, targetY: Int, action: String) {
+        val startX = params?.x ?: 50
+        val startY = params?.y ?: 300
+        val steps = 20
+        val delayPerStep = 16L
+
+        for (i in 0..steps) {
+            val progress = i.toFloat() / steps
+            val eased = progress * progress * (3 - 2 * progress)
+            handler.postDelayed({
+                params?.x = (startX + ((targetX - startX) * eased)).toInt()
+                params?.y = (startY + ((targetY - startY) * eased)).toInt()
+                windowManager?.updateViewLayout(overlayView, params)
+
+                if (i == steps) {
+                    when (action) {
+                        "jealous" -> {
+                            overlayView?.evaluateJavascript(
+                                "window.petEngine && window.petEngine.onJealous($targetX, $targetY)", null
+                            )
+                        }
+                    }
+                }
+            }, delayPerStep * i)
+        }
     }
 
     private fun setupOverlay() {
@@ -67,7 +132,6 @@ class OverlayService : Service() {
         windowManager?.addView(overlayView, params)
     }
 
-    // === GESTURE HANDLING ===
     private var initialX = 0
     private var initialY = 0
     private var initialTouchX = 0f
@@ -169,22 +233,15 @@ class OverlayService : Service() {
     }
 
     private fun onTap() {
-        overlayView?.evaluateJavascript(
-            "window.petEngine && window.petEngine.onTap()", null
-        )
+        overlayView?.evaluateJavascript("window.petEngine && window.petEngine.onTap()", null)
     }
     private fun onDoubleTap() {
-        overlayView?.evaluateJavascript(
-            "window.petEngine && window.petEngine.onDoubleTap()", null
-        )
+        overlayView?.evaluateJavascript("window.petEngine && window.petEngine.onDoubleTap()", null)
     }
     private fun onLongPress() {
-        overlayView?.evaluateJavascript(
-            "window.petEngine && window.petEngine.onLongPress()", null
-        )
+        overlayView?.evaluateJavascript("window.petEngine && window.petEngine.onLongPress()", null)
     }
 
-    // === NOTIFICATION ===
     private val whisperMessages = arrayOf(
         "嗷~ 我在呢", "今天天气不错", "记得喝水哦", "别熬夜啦",
         "想你了", "♡", "咕噜噜…", "好安静", "zzZ...",
@@ -212,20 +269,16 @@ class OverlayService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID,
-                "虎鲸桌宠",
-                NotificationManager.IMPORTANCE_LOW
+                CHANNEL_ID, "虎鲸桌宠", NotificationManager.IMPORTANCE_LOW
             ).apply { setShowBadge(false) }
-            getSystemService(NotificationManager::class.java)
-                .createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
-    private fun dpToPx(dp: Int): Int {
-        return (dp * resources.displayMetrics.density).toInt()
-    }
+    private fun dpToPx(dp: Int) = (dp * resources.displayMetrics.density).toInt()
 
     override fun onDestroy() {
+        receiver?.let { unregisterReceiver(it) }
         overlayView?.let {
             windowManager?.removeView(it)
             it.destroy()

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">虎鲸桌宠</string>
+    <string name="accessibility_service_description">虎鲸桌宠需要无障碍权限来感知你的屏幕操作，让虎鲸能跟随你的指尖、在你聊天时吃醋。</string>
+</resources>
