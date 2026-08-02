@@ -25,76 +25,150 @@ body {
   justify-content: center;
 }
 .pet-img {
-  width: 100%;
+  width: 70%;
   height: auto;
   image-rendering: auto;
-  transition: transform 0.15s ease-out;
   pointer-events: none;
+  animation: idleFloat 3s ease-in-out infinite;
 }
-.pet-img.tap { transform: scale(1.15); }
-.pet-img.doubletap { transform: scale(1.3) rotate(-5deg); }
-.pet-img.longpress { transform: scale(0.85); filter: brightness(1.3); }
+@keyframes idleFloat {
+  0%,100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-6px) rotate(1deg); }
+  75% { transform: translateY(4px) rotate(-1deg); }
+}
+.pet-img.tap { animation: tapBounce 0.3s ease-out; }
+.pet-img.doubletap { animation: doubleShake 0.5s ease-out; }
+.pet-img.longpress { animation: squish 0.5s ease-out; }
 .pet-img.fling-left { animation: flingLeft 0.8s ease-out forwards; }
 .pet-img.fling-right { animation: flingRight 0.8s ease-out forwards; }
 .pet-img.crawl-back-left { animation: crawlBackLeft 1.5s ease-in-out forwards; }
 .pet-img.crawl-back-right { animation: crawlBackRight 1.5s ease-in-out forwards; }
 .pet-img.sleep { animation: sleepFloat 4s ease-in-out infinite; }
 .pet-img.wake { animation: wakeUp 0.6s ease-out; }
-
+.pet-img.happy { animation: happySpin 0.6s ease-out; }
+.pet-img.angry { animation: angryShake 0.4s ease-out; }
+.pet-img.shy { animation: shyHide 0.8s ease-out; }
+.pet-img.heart { animation: heartBeat 0.8s ease-out; }
+@keyframes tapBounce {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-15px) scale(1.1); }
+  60% { transform: translateY(5px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes doubleShake {
+  0%,100% { transform: rotate(0); }
+  20% { transform: rotate(-8deg) scale(1.1); }
+  40% { transform: rotate(6deg); }
+  60% { transform: rotate(-4deg); }
+  80% { transform: rotate(2deg); }
+}
+@keyframes squish {
+  0% { transform: scale(1,1); }
+  30% { transform: scale(1.2,0.8); }
+  60% { transform: scale(0.9,1.1); }
+  100% { transform: scale(1,1); }
+}
 @keyframes flingLeft {
   0% { transform: translateX(0) rotate(0); opacity: 1; }
-  100% { transform: translateX(-200px) rotate(-30deg); opacity: 0; }
+  100% { transform: translateX(-250px) translateY(-80px) rotate(-40deg); opacity: 0; }
 }
 @keyframes flingRight {
   0% { transform: translateX(0) rotate(0); opacity: 1; }
-  100% { transform: translateX(200px) rotate(30deg); opacity: 0; }
+  100% { transform: translateX(250px) translateY(-80px) rotate(40deg); opacity: 0; }
 }
 @keyframes crawlBackLeft {
-  0% { transform: translateX(-200px) rotate(-30deg); opacity: 0; }
-  60% { transform: translateX(-30px) rotate(5deg); opacity: 1; }
+  0% { transform: translateX(-250px) rotate(-40deg); opacity: 0; }
+  50% { transform: translateX(-40px) rotate(8deg); opacity: 1; }
+  70% { transform: translateX(10px) rotate(-3deg); }
   100% { transform: translateX(0) rotate(0); opacity: 1; }
 }
 @keyframes crawlBackRight {
-  0% { transform: translateX(200px) rotate(30deg); opacity: 0; }
-  60% { transform: translateX(30px) rotate(-5deg); opacity: 1; }
+  0% { transform: translateX(250px) rotate(40deg); opacity: 0; }
+  50% { transform: translateX(40px) rotate(-8deg); opacity: 1; }
+  70% { transform: translateX(-10px) rotate(3deg); }
   100% { transform: translateX(0) rotate(0); opacity: 1; }
 }
 @keyframes sleepFloat {
-  0%,100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-8px) scale(1.03); }
+  0%,100% { transform: translateY(0) scale(0.85); }
+  50% { transform: translateY(-5px) scale(0.88); }
 }
 @keyframes wakeUp {
-  0% { transform: scale(0.8); opacity: 0.5; }
-  50% { transform: scale(1.1); }
+  0% { transform: scale(0.7); opacity: 0.3; }
+  50% { transform: scale(1.15); }
   100% { transform: scale(1); opacity: 1; }
 }
-
+@keyframes happySpin {
+  0% { transform: rotate(0) scale(1); }
+  30% { transform: rotate(15deg) scale(1.15); }
+  60% { transform: rotate(-10deg) scale(1.05); }
+  100% { transform: rotate(0) scale(1); }
+}
+@keyframes angryShake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+@keyframes shyHide {
+  0% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(0.7); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes heartBeat {
+  0% { transform: scale(1); }
+  15% { transform: scale(1.3); }
+  30% { transform: scale(1); }
+  45% { transform: scale(1.2); }
+  60% { transform: scale(1); }
+  75% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
 .bubble {
   position: absolute;
-  background: rgba(255,255,255,0.92);
-  border-radius: 16px;
-  padding: 8px 14px;
-  font-size: 13px;
+  top: -10px;
+  background: rgba(255,255,255,0.94);
+  border-radius: 18px;
+  padding: 10px 16px;
+  font-size: 14px;
   color: #333;
-  max-width: 200px;
+  max-width: 220px;
   text-align: center;
   pointer-events: none;
   opacity: 0;
-  transform: translateY(0);
-  transition: opacity 0.3s, transform 0.3s;
+  transform: translateY(10px);
+  transition: opacity 0.25s, transform 0.25s;
   font-family: sans-serif;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+  z-index: 10;
+}
+.bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid rgba(255,255,255,0.94);
 }
 .bubble.show {
   opacity: 1;
-  transform: translateY(-10px);
+  transform: translateY(0);
 }
 .bubble.heart { background: #ffe0e6; color: #c0392b; }
-.bubble.angry { background: #ffe0e0; color: #c0392b; font-weight: bold; }
-.bubble.whisper { background: #e8e8e8; color: #666; font-size: 11px; }
-.bubble.jealous { background: #e0ffe0; color: #27ae60; }
-
+.bubble.heart::after { border-top-color: #ffe0e6; }
+.bubble.angry { background: #ffe0e0; color: #c0392b; font-weight: bold; font-size: 15px; }
+.bubble.angry::after { border-top-color: #ffe0e0; }
+.bubble.whisper { background: #f0f0f0; color: #888; font-size: 12px; }
+.bubble.whisper::after { border-top-color: #f0f0f0; }
+.bubble.jealous { background: #e8f5e9; color: #2e7d32; }
+.bubble.jealous::after { border-top-color: #e8f5e9; }
+.bubble.love { background: #fce4ec; color: #e91e63; font-size: 16px; font-weight: bold; }
+.bubble.love::after { border-top-color: #fce4ec; }
 .heat-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -111,47 +185,49 @@ body {
   <div class="bubble" id="bubble"></div>
 </div>
 <div class="heat-overlay" id="heatOverlay"></div>
-
 <script>
 const SUPABASE_URL = 'https://xqsfkbvyrfvrtwqzusth.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9meu2NTqGMX6YvKaEPPamw_bvXu6gSA';
-
 const petImg = document.getElementById('petImg');
 const bubble = document.getElementById('bubble');
 const heatOverlay = document.getElementById('heatOverlay');
-
 let heat = 0;
 let tapCount = 0;
 let tapTimer = null;
 let bubbleTimer = null;
 let isSleeping = false;
 let lastInteraction = Date.now();
+let mood = 'neutral';
 
-// === Pet Engine (called from Kotlin) ===
+function resetIdle() {
+  petImg.style.animation = '';
+  petImg.style.animation = 'idleFloat 3s ease-in-out infinite';
+}
+
 window.petEngine = {
   onTap() {
     if (isSleeping) { this.wakeUp(); return; }
     lastInteraction = Date.now();
     tapCount++;
     clearTimeout(tapTimer);
-    tapTimer = setTimeout(() => { tapCount = 0; }, 2000);
+    tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
     
     if (tapCount >= 8) {
-      this.doAnimation('longpress');
+      this.doAnim('angry');
       this.showBubble('戳够了没！！(╯°□°)╯', 'angry');
       this.addHeat(15);
       tapCount = 0;
     } else if (tapCount >= 5) {
-      this.doAnimation('doubletap');
+      this.doAnim('angry');
       this.showBubble('啊啊啊别戳了！', 'angry');
       this.addHeat(10);
     } else if (tapCount >= 3) {
-      this.doAnimation('doubletap');
+      this.doAnim('happy');
       this.showBubble('干嘛啦~', 'heart');
       this.addHeat(5);
     } else {
-      this.doAnimation('tap');
-      const msgs = ['嗯？', '嘻嘻', '嗷~', '？', '♡', '…', '哼', '诶嘿'];
+      this.doAnim('tap');
+      const msgs = ['嗯？', '嘻嘻', '嗷~', '？', '♡', '…', '哼', '诶嘿', '干嘛', '摸我干嘛'];
       this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'heart');
       this.addHeat(2);
     }
@@ -161,7 +237,7 @@ window.petEngine = {
   onDoubleTap() {
     if (isSleeping) { this.wakeUp(); return; }
     lastInteraction = Date.now();
-    this.doAnimation('doubletap');
+    this.doAnim('doubletap');
     this.showBubble('！！！', 'angry');
     this.addHeat(8);
     this.logGesture('double_tap');
@@ -170,8 +246,8 @@ window.petEngine = {
   onLongPress() {
     if (isSleeping) { this.wakeUp(); return; }
     lastInteraction = Date.now();
-    this.doAnimation('longpress');
-    const msgs = ['……放手', '好痛', '你在干嘛', '不要这样'];
+    this.doAnim('longpress');
+    const msgs = ['……放手', '好痛', '你在干嘛', '不要这样', '压扁了…'];
     this.showBubble(msgs[Math.floor(Math.random() * msgs.length)], 'whisper');
     this.addHeat(12);
     this.logGesture('long_press');
@@ -182,12 +258,16 @@ window.petEngine = {
     lastInteraction = Date.now();
     const animClass = direction === 'left' ? 'fling-left' : 'fling-right';
     const crawlClass = direction === 'left' ? 'crawl-back-left' : 'crawl-back-right';
+    petImg.style.animation = '';
     petImg.classList.add(animClass);
     this.showBubble('呜哇——', 'angry');
     setTimeout(() => {
       petImg.classList.remove(animClass);
       petImg.classList.add(crawlClass);
-      setTimeout(() => petImg.classList.remove(crawlClass), 1500);
+      setTimeout(() => {
+        petImg.classList.remove(crawlClass);
+        resetIdle();
+      }, 1500);
     }, 800);
     this.logGesture('fling_' + direction);
   },
@@ -196,9 +276,11 @@ window.petEngine = {
     switch(state) {
       case 'sleep': this.sleep(); break;
       case 'wake': this.wakeUp(); break;
-      case 'happy': this.showBubble('♡', 'heart'); break;
-      case 'angry': this.showBubble('哼！', 'angry'); break;
-      case 'jealous': this.showBubble('……那是谁', 'jealous'); break;
+      case 'happy': this.doAnim('happy'); this.showBubble('♡', 'love'); break;
+      case 'angry': this.doAnim('angry'); this.showBubble('哼！', 'angry'); break;
+      case 'jealous': this.doAnim('shy'); this.showBubble('……那是谁', 'jealous'); break;
+      case 'love': this.doAnim('heart'); this.showBubble('♡♡♡', 'love'); break;
+      case 'shy': this.doAnim('shy'); this.showBubble('///', 'whisper'); break;
     }
   },
 
@@ -208,6 +290,7 @@ window.petEngine = {
 
   sleep() {
     isSleeping = true;
+    petImg.style.animation = '';
     petImg.src = 'orca_small.png';
     petImg.classList.add('sleep');
     this.showBubble('zzZ...', 'whisper');
@@ -218,14 +301,21 @@ window.petEngine = {
     petImg.src = 'orca.png';
     petImg.classList.remove('sleep');
     petImg.classList.add('wake');
-    setTimeout(() => petImg.classList.remove('wake'), 600);
+    setTimeout(() => {
+      petImg.classList.remove('wake');
+      resetIdle();
+    }, 600);
     this.showBubble('嗯…醒了', 'whisper');
     lastInteraction = Date.now();
   },
 
-  doAnimation(cls) {
+  doAnim(cls) {
+    petImg.style.animation = '';
     petImg.classList.add(cls);
-    setTimeout(() => petImg.classList.remove(cls), 200);
+    setTimeout(() => {
+      petImg.classList.remove(cls);
+      resetIdle();
+    }, cls === 'tap' ? 300 : cls === 'doubletap' ? 500 : 600);
   },
 
   showBubble(text, style) {
@@ -259,7 +349,6 @@ window.petEngine = {
   }
 };
 
-// === Poll AI state ===
 async function pollState() {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/pet_state?order=updated_at.desc&limit=1`, {
@@ -276,7 +365,6 @@ async function pollState() {
 }
 setInterval(pollState, 5000);
 
-// === Idle loneliness ===
 setInterval(() => {
   if (isSleeping) return;
   const idle = Date.now() - lastInteraction;
@@ -289,15 +377,15 @@ setInterval(() => {
   }
 }, 60000);
 
-// === Random idle mumbles ===
 const idleMsgs = [
   '咕噜噜…', '今天天气不错', '有点饿了', '♡', '…', 
-  '好安静', '想出去玩', 'zzZ...唔', '诶？', '哼~'
+  '好安静', '想出去玩', 'zzZ...唔', '诶？', '哼~',
+  '看看你在干嘛', '别刷太久手机', '想你了'
 ];
 setInterval(() => {
   if (isSleeping) return;
   if (Date.now() - lastInteraction < 60000) return;
-  if (Math.random() > 0.3) return;
+  if (Math.random() > 0.25) return;
   const msg = idleMsgs[Math.floor(Math.random() * idleMsgs.length)];
   window.petEngine.showBubble(msg, 'whisper');
 }, 45000);
