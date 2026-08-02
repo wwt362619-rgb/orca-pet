@@ -25,7 +25,7 @@ class OverlayService : Service() {
     private var touchOverlay: View? = null
     private var touchParams: WindowManager.LayoutParams? = null
     private var screenTapCount = 0
-    private var lastTapTime = 0L
+    private var screenTouchTime = 0L
     private var receiver: BroadcastReceiver? = null
 
     companion object {
@@ -118,7 +118,7 @@ class OverlayService : Service() {
         screenTapCount++
         
         // If user is tapping rapidly (typing/scrolling), pet gets curious
-        if (now - lastTapTime < 200) {
+        if (now - screenTouchTime < 200) {
             if (screenTapCount > 10) {
                 overlayView?.evaluateJavascript(
                     "window.petEngine && window.petEngine.setState('curious')", null
@@ -128,7 +128,7 @@ class OverlayService : Service() {
         } else {
             screenTapCount = 1
         }
-        lastTapTime = now
+        screenTouchTime = now
     }
 
     private fun animatePetTo(targetX: Int, targetY: Int, action: String) {
