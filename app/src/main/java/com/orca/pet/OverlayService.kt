@@ -95,6 +95,11 @@ class OverlayService : Service() {
                                 "window.petEngine && window.petEngine.onJealous($targetX, $targetY)", null
                             )
                         }
+                        "screen_longpress" -> {
+                            overlayView?.evaluateJavascript(
+                                "window.petEngine && window.petEngine.onScreenLongPress($targetX, $targetY)", null
+                            )
+                        }
                     }
                 }
             }, delayPerStep * i)

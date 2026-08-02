@@ -22,9 +22,13 @@ class PetAccessibilityService : AccessibilityService() {
     private var screenTouchCount = 0
     private var lastAppPackage = ""
     private var lastChatText = ""
-    private var petX = 50
-    private var petY = 300
-    private var isPetNearChat = false
+
+    // Long press detection on screen (not on pet)
+    private var screenPressStartTime = 0L
+    private var screenPressX = 0f
+    private var screenPressY = 0f
+    private var isScreenPressing = false
+    private var longPressTriggered = false
 
     companion object {
         var instance: PetAccessibilityService? = null
@@ -50,8 +54,15 @@ class PetAccessibilityService : AccessibilityService() {
         if (event == null) return
 
         when (event.eventType) {
-            AccessibilityEvent.TYPE_VIEW_CLICKED,
-            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> {
+                handleScreenTap(event)
+            }
+            AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> {
+                handleScreenLongPress(event)
+            }
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
+                handleScreenInteraction(event)
+            }
             AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
                 handleScreenInteraction(event)
             }
@@ -59,12 +70,28 @@ class PetAccessibilityService : AccessibilityService() {
                 handleWindowChange(event)
             }
             AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED -> {
-                // User is typing / selecting text - pet gets curious
                 notifyPet("curious", "在写什么呀…")
+            }
+            AccessibilityEvent.TYPE_TOUCH_INTERACTION_START -> {
+                // Raw touch start - track for long press
+                screenPressStartTime = System.currentTimeMillis()
+                isScreenPressing = true
+                longPressTriggered = false
+                // Check after 800ms if still pressing
+                handler.postDelayed({
+                    if (isScreenPressing && !longPressTriggered) {
+                        longPressTriggered = true
+                        // Get last known touch position from event
+                        triggerScreenLongPress()
+                    }
+                }, 800)
+            }
+            AccessibilityEvent.TYPE_TOUCH_INTERACTION_END -> {
+                isScreenPressing = false
             }
         }
 
-        // Check for chat apps
+        // Track package changes
         val pkg = event.packageName?.toString() ?: ""
         if (pkg != lastAppPackage && pkg.isNotEmpty()) {
             lastAppPackage = pkg
@@ -72,13 +99,49 @@ class PetAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun handleScreenInteraction(event: AccessibilityEvent) {
+    private fun handleScreenTap(event: AccessibilityEvent) {
         screenTouchCount++
         val now = System.currentTimeMillis()
 
-        // If user is actively tapping around (not on pet), pet should notice
+        // If user is tapping around a lot (not on pet), pet notices
         if (now - lastScreenTouchTime > 3000 && screenTouchCount > 5) {
-            // User is busy tapping elsewhere
+            notifyPet("curious", "嗯？")
+            screenTouchCount = 0
+        }
+        lastScreenTouchTime = now
+    }
+
+    private fun handleScreenLongPress(event: AccessibilityEvent) {
+        Log.d(TAG, "Screen long press detected via event")
+        triggerScreenLongPress()
+    }
+
+    private fun triggerScreenLongPress() {
+        // Get current pet position from overlay and make it trot to the press location
+        val root = rootInActiveWindow
+        if (root != null) {
+            val rect = Rect()
+            root.getBoundsInScreen(rect)
+            val targetX = rect.centerX() - 60
+            val targetY = rect.centerY() - 80
+            root.recycle()
+
+            val intent = Intent("com.orca.pet.MOVE_TO").apply {
+                putExtra("x", targetX)
+                putExtra("y", targetY)
+                putExtra("action", "screen_longpress")
+            }
+            sendBroadcast(intent)
+        } else {
+            // Fallback: just tell pet to trot
+            notifyPet("happy", "来啦来啦~♡")
+        }
+    }
+
+    private fun handleScreenInteraction(event: AccessibilityEvent) {
+        screenTouchCount++
+        val now = System.currentTimeMillis()
+        if (now - lastScreenTouchTime > 3000 && screenTouchCount > 5) {
             notifyPet("curious", "嗯？")
             screenTouchCount = 0
         }
@@ -87,22 +150,14 @@ class PetAccessibilityService : AccessibilityService() {
 
     private fun handleWindowChange(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: ""
-        val className = event.className?.toString() ?: ""
-
-        // Detect chat apps
         val chatApps = listOf(
-            "com.tencent.mobileqq",
-            "com.tencent.mm",
-            "com.ss.android.ugc.aweme.lite",
-            "com.ss.android.ugc.aweme",
-            "com.sina.weibo",
-            "com.zhiliaoapp.musically",
+            "com.tencent.mobileqq", "com.tencent.mm",
+            "com.ss.android.ugc.aweme.lite", "com.ss.android.ugc.aweme",
+            "com.sina.weibo", "com.zhiliaoapp.musically",
             "com.icesimba.android.vampire"
         )
-
         if (pkg in chatApps && pkg != "com.ai.assistance.operit") {
             Log.d(TAG, "Chat app detected: $pkg")
-            // Scan for chat input fields
             handler.postDelayed({ scanForChatContent(pkg) }, 2000)
         }
     }
@@ -120,33 +175,25 @@ class PetAccessibilityService : AccessibilityService() {
 
     private fun scanForChatContent(pkg: String) {
         val root = rootInActiveWindow ?: return
-
-        // Look for EditText fields (chat input)
         val editTexts = root.findAccessibilityNodeInfosByViewId("${pkg}:id/input")
         if (editTexts.isEmpty()) {
-            // Try finding any editable nodes
             findEditableNodes(root)
         }
-
-        // Look for chat message bubbles
         val chatBubbles = findChatBubbles(root)
         if (chatBubbles.isNotEmpty()) {
             val otherPersonText = chatBubbles.joinToString(" ") { it.text?.toString() ?: "" }
             if (otherPersonText.isNotBlank() && otherPersonText != lastChatText) {
                 lastChatText = otherPersonText
                 Log.d(TAG, "Chat detected: $otherPersonText")
-                // Someone else is talking to user → jealous!
                 triggerJealous()
             }
         }
-
         root.recycle()
     }
 
     private fun findEditableNodes(node: AccessibilityNodeInfo) {
         if (node.isEditable) {
             Log.d(TAG, "Found editable: ${node.text}")
-            // User is typing a message → pet gets curious
             notifyPet("curious", "在跟谁聊天呀…")
         }
         for (i in 0 until node.childCount) {
@@ -156,11 +203,9 @@ class PetAccessibilityService : AccessibilityService() {
 
     private fun findChatBubbles(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> {
         val bubbles = mutableListOf<AccessibilityNodeInfo>()
-        // Look for text views that look like chat messages
         if (node.text != null && node.text.length > 5 && node.className?.toString()?.contains("TextView") == true) {
             val rect = Rect()
             node.getBoundsInScreen(rect)
-            // Chat bubbles usually in middle of screen
             if (rect.top > 100 && rect.bottom < 2000) {
                 bubbles.add(node)
             }
@@ -172,14 +217,11 @@ class PetAccessibilityService : AccessibilityService() {
     }
 
     private fun triggerJealous() {
-        // Move pet toward the chat area
         val root = rootInActiveWindow ?: return
         val rect = Rect()
         root.getBoundsInScreen(rect)
         val targetX = rect.centerX() - 60
         val targetY = rect.top + 200
-
-        // Send move command via broadcast
         val intent = Intent("com.orca.pet.MOVE_TO").apply {
             putExtra("x", targetX)
             putExtra("y", targetY)
