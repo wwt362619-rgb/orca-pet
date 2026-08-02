@@ -22,10 +22,6 @@ class OverlayService : Service() {
     private var overlayView: WebView? = null
     private var params: WindowManager.LayoutParams? = null
     private val handler = Handler(Looper.getMainLooper())
-    private var touchOverlay: View? = null
-    private var touchParams: WindowManager.LayoutParams? = null
-    private var screenTapCount = 0
-    private var screenTouchTime = 0L
     private var receiver: BroadcastReceiver? = null
 
     companion object {
@@ -42,7 +38,6 @@ class OverlayService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("嗷~"))
         setupOverlay()
-        setupTouchOverlay()
         setupBroadcastReceiver()
     }
 
@@ -78,57 +73,6 @@ class OverlayService : Service() {
             addAction("com.orca.pet.SET_STATE")
         }
         registerReceiver(receiver, filter)
-    }
-
-    private fun setupTouchOverlay() {
-        touchParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = 0
-            y = 0
-        }
-
-        touchOverlay = object : View(this) {
-            override fun onTouchEvent(event: MotionEvent): Boolean {
-                // FLAG_NOT_TOUCHABLE means we only get ACTION_OUTSIDE
-                // which tells us a touch happened somewhere on screen
-                if (event.action == MotionEvent.ACTION_OUTSIDE) {
-                    onScreenTouched()
-                }
-                return false
-            }
-        }.apply {
-            setBackgroundColor(0x00000000)
-        }
-        windowManager?.addView(touchOverlay, touchParams)
-    }
-
-    private fun onScreenTouched() {
-        val now = System.currentTimeMillis()
-        screenTapCount++
-        
-        // If user is tapping rapidly (typing/scrolling), pet gets curious
-        if (now - screenTouchTime < 200) {
-            if (screenTapCount > 10) {
-                overlayView?.evaluateJavascript(
-                    "window.petEngine && window.petEngine.setState('curious')", null
-                )
-                screenTapCount = 0
-            }
-        } else {
-            screenTapCount = 1
-        }
-        screenTouchTime = now
     }
 
     private fun animatePetTo(targetX: Int, targetY: Int, action: String) {

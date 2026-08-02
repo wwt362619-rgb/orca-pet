@@ -16,10 +16,10 @@ import android.view.accessibility.AccessibilityNodeInfo
 class PetAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private var lastScreenTouchTime = 0L
-    private var screenTouchCount = 0
     private var lastAppPackage = ""
     private var lastChatText = ""
+    private var screenTouchCount = 0
+    private var lastTouchTime = 0L
 
     companion object {
         var instance: PetAccessibilityService? = null
@@ -41,14 +41,42 @@ class PetAccessibilityService : AccessibilityService() {
         Log.d(TAG, "Accessibility service connected")
     }
 
+    // === GESTURE CALLBACK (Android 12+) ===
+    // This receives global gestures WITHOUT blocking touch
+    override fun onGesture(gestureId: Int): Boolean {
+        Log.d(TAG, "onGesture: $gestureId")
+        val now = System.currentTimeMillis()
+        screenTouchCount++
+
+        // Every 15 touches, pet gets curious
+        if (screenTouchCount >= 15) {
+            screenTouchCount = 0
+            notifyPet("curious", "嗯？")
+        }
+
+        // Reset counter if idle for 3 seconds
+        if (now - lastTouchTime > 3000) {
+            screenTouchCount = 0
+        }
+        lastTouchTime = now
+
+        return false // Don't consume, let touch pass through
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
         when (event.eventType) {
-            AccessibilityEvent.TYPE_VIEW_CLICKED -> handleScreenTap(event)
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> {
+                screenTouchCount++
+                val now = System.currentTimeMillis()
+                if (now - lastTouchTime > 3000 && screenTouchCount > 5) {
+                    notifyPet("curious", "嗯？")
+                    screenTouchCount = 0
+                }
+                lastTouchTime = now
+            }
             AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> handleScreenLongPress(event)
-            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> handleScreenInteraction(event)
-            AccessibilityEvent.TYPE_VIEW_SCROLLED -> handleScreenInteraction(event)
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> handleWindowChange(event)
             AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED ->
                 notifyPet("curious", "在写什么呀…")
@@ -61,37 +89,7 @@ class PetAccessibilityService : AccessibilityService() {
         }
     }
 
-    // === GESTURE DETECTION (non-blocking, via dispatchGesture) ===
-    // We use a trick: dispatch a tiny invisible gesture to detect if user is touching
-    // Actually, the proper way is to use the touch exploration proxy.
-    // Since we can't directly intercept touches without blocking, we use
-    // TYPE_TOUCH_INTERACTION_START/END which works on many devices.
-
-    private var touchDownTime = 0L
-    private var touchDownX = 0f
-    private var touchDownY = 0f
-    private var isTouching = false
-    private var longPressFired = false
-    private var moveCount = 0
-    private var lastTouchX = 0f
-    private var lastTouchY = 0f
-
-    // We'll use a different approach: monitor TYPE_TOUCH_INTERACTION events
-    // and also use the root node's bounds to detect where touches happen
-
-    private fun handleScreenTap(event: AccessibilityEvent) {
-        screenTouchCount++
-        val now = System.currentTimeMillis()
-        if (now - lastScreenTouchTime > 3000 && screenTouchCount > 5) {
-            notifyPet("curious", "嗯？")
-            screenTouchCount = 0
-        }
-        lastScreenTouchTime = now
-    }
-
     private fun handleScreenLongPress(event: AccessibilityEvent) {
-        Log.d(TAG, "Screen long press via event")
-        // Get the focused node position as approximate touch location
         val source = event.source ?: return
         val rect = Rect()
         source.getBoundsInScreen(rect)
@@ -99,16 +97,6 @@ class PetAccessibilityService : AccessibilityService() {
         val x = rect.centerX() - 60
         val y = rect.centerY() - 80
         movePetTo(x, y, "screen_longpress")
-    }
-
-    private fun handleScreenInteraction(event: AccessibilityEvent) {
-        screenTouchCount++
-        val now = System.currentTimeMillis()
-        if (now - lastScreenTouchTime > 3000 && screenTouchCount > 5) {
-            notifyPet("curious", "嗯？")
-            screenTouchCount = 0
-        }
-        lastScreenTouchTime = now
     }
 
     private fun handleWindowChange(event: AccessibilityEvent) {
@@ -120,7 +108,6 @@ class PetAccessibilityService : AccessibilityService() {
             "com.icesimba.android.vampire"
         )
         if (pkg in chatApps && pkg != "com.ai.assistance.operit") {
-            Log.d(TAG, "Chat app: $pkg")
             handler.postDelayed({ scanForChatContent(pkg) }, 2000)
         }
     }
@@ -154,7 +141,6 @@ class PetAccessibilityService : AccessibilityService() {
 
     private fun findEditableNodes(node: AccessibilityNodeInfo) {
         if (node.isEditable) {
-            Log.d(TAG, "Editable: ${node.text}")
             notifyPet("curious", "在跟谁聊天呀…")
         }
         for (i in 0 until node.childCount) {
