@@ -52,7 +52,6 @@ class OverlayService : Service() {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
@@ -103,12 +102,12 @@ class OverlayService : Service() {
                         globalLongPressTriggered = true
                         onGlobalLongPress(event.rawX, event.rawY)
                     }
-                }, 600)
+                }, 500)
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = Math.abs(event.rawX - globalTouchStartX)
                 val dy = Math.abs(event.rawY - globalTouchStartY)
-                if (dx > 15 || dy > 15) {
+                if (dx > 8 || dy > 8) {
                     globalTouchMoved = true
                 }
                 globalTouchMoveCount++
@@ -116,8 +115,8 @@ class OverlayService : Service() {
                 globalLastMoveY = event.rawY
                 globalLastMoveTime = System.currentTimeMillis()
 
-                // After some movement, pet slowly follows
-                if (globalTouchMoveCount % 8 == 0) {
+                // Pet follows finger movement smoothly
+                if (globalTouchMoveCount % 3 == 0) {
                     onGlobalSwipeFollow(event.rawX, event.rawY)
                 }
             }
@@ -147,9 +146,9 @@ class OverlayService : Service() {
         val targetX = x.toInt() - dpToPx(PET_SIZE_DP) / 2
         val targetY = y.toInt() - dpToPx(PET_HEIGHT_DP) / 2
 
-        // Slow follow: move 15% of the way each step
-        val newX = currentX + ((targetX - currentX) * 0.15f).toInt()
-        val newY = currentY + ((targetY - currentY) * 0.15f).toInt()
+        // Smooth follow: move 25% of the way each step
+        val newX = currentX + ((targetX - currentX) * 0.25f).toInt()
+        val newY = currentY + ((targetY - currentY) * 0.25f).toInt()
 
         params?.x = newX
         params?.y = newY
