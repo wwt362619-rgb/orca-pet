@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.view.*
+import android.view.MotionEvent
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebSettings
