@@ -18,6 +18,7 @@ class PetAccessibilityService : AccessibilityService() {
     private var screenTouchCount = 0
     private var lastTouchTime = 0L
     private var lastScrollTime = 0L
+    private var scrollCount = 0
 
     companion object {
         var instance: PetAccessibilityService? = null
@@ -45,11 +46,16 @@ class PetAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> {
                 screenTouchCount++
                 val now = System.currentTimeMillis()
-                if (now - lastTouchTime > 3000 && screenTouchCount > 5) {
+                // Only trigger after 15 clicks AND at least 30 seconds since last trigger
+                if (screenTouchCount >= 15 && now - lastTouchTime > 30000) {
                     notifyPet("curious", "嗯？")
                     screenTouchCount = 0
+                    lastTouchTime = now
                 }
-                lastTouchTime = now
+                // Reset counter if idle for 5 seconds
+                if (now - lastTouchTime > 5000 && screenTouchCount < 15) {
+                    screenTouchCount = 0
+                }
             }
             AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> handleScreenLongPress(event)
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> handleWindowChange(event)
@@ -98,8 +104,11 @@ class PetAccessibilityService : AccessibilityService() {
     // === NEW: Scroll detection — pet follows scrolling activity ===
     private fun handleScroll(event: AccessibilityEvent) {
         val now = System.currentTimeMillis()
-        // Throttle: max once per second
-        if (now - lastScrollTime < 1000) return
+        // Throttle: max once per 10 seconds, and only after 5 scroll events
+        if (now - lastScrollTime < 10000) return
+        scrollCount++
+        if (scrollCount < 5) return
+        scrollCount = 0
         lastScrollTime = now
 
         // Get screen center as target
