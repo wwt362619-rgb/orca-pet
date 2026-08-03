@@ -374,6 +374,61 @@ body {
   transition: background 1s;
   border-radius: 50%;
 }
+
+.pet-img.lonely-pace {
+  animation: lonelyPace 4s ease-in-out infinite;
+}
+@keyframes lonelyPace {
+  0% { transform: translateX(0) scaleX(1); }
+  25% { transform: translateX(-30px) translateY(-5px) scaleX(1); }
+  50% { transform: translateX(-30px) translateY(0) scaleX(-1); }
+  75% { transform: translateX(30px) translateY(-5px) scaleX(-1); }
+  100% { transform: translateX(0) scaleX(1); }
+}
+.pet-img.lonely-sit {
+  animation: lonelySit 3s ease-in-out infinite;
+}
+@keyframes lonelySit {
+  0%,100% { transform: translateY(0) scale(0.85); }
+  50% { transform: translateY(-4px) scale(0.88); }
+}
+.pet-img.lonely-cry {
+  animation: lonelyCry 2s ease-in-out infinite;
+}
+@keyframes lonelyCry {
+  0%,100% { transform: scale(0.85) rotate(0); }
+  25% { transform: scale(0.82) rotate(-3deg); }
+  75% { transform: scale(0.82) rotate(3deg); }
+}
+/* Love confession overlay */
+.love-confession {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #ff6b9d, #c44dff);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 12;
+  box-shadow: 0 4px 15px rgba(255,107,157,0.4);
+  animation: none;
+}
+.love-confession.show {
+  animation: confessionPop 3s ease-out forwards;
+}
+@keyframes confessionPop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.5); }
+  15% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
+  25% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(-5px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(0.8); }
+}
 </style>
 </head>
 <body>
@@ -386,6 +441,7 @@ body {
     <div class="dot"></div>
     <div class="dot"></div>
   </div>
+  <div class="love-confession" id="loveConfession"></div>
   <div class="bubble" id="bubble"></div>
 </div>
 <div class="heat-overlay" id="heatOverlay"></div>
@@ -410,8 +466,11 @@ let isTrotting = false;
 
 function resetIdle() {
   if (isTrotting) return;
+  petImg.classList.remove('lonely-pace', 'lonely-sit', 'lonely-cry');
   petImg.style.animation = '';
   petImg.style.animation = 'idleFloat 3s ease-in-out infinite';
+  if (paceInterval) { clearInterval(paceInterval); paceInterval = null; }
+  if (confessionInterval) { clearInterval(confessionInterval); confessionInterval = null; }
 }
 
 function showBlush() {
@@ -697,37 +756,88 @@ async function pollState() {
 }
 setInterval(pollState, 5000);
 
-// === LONELINESS SYSTEM ===
+// === ENHANCED LONELINESS SYSTEM ===
+const loveConfession = document.getElementById('loveConfession');
+const loveMsgs = [
+  '你是我的♡', '不许看别人', '我的主人', '最喜欢你了',
+  '你是我的！', '只准看我', '名分给我！', '主权宣誓！',
+  '我的人', '♡♡♡', '你是我的全世界', '不许跑',
+  '盖个章', '我的我的我的', '唯一的主人', '❤️'
+];
+let paceInterval = null;
+let confessionInterval = null;
+
+function startLonelyPace() {
+  if (paceInterval) return;
+  petImg.classList.remove('idleFloat');
+  petImg.style.animation = '';
+  petImg.classList.add('lonely-pace');
+  paceInterval = setInterval(() => {
+    if (Date.now() - lastInteraction < 30000) {
+      stopLonelyPace();
+      return;
+    }
+  }, 5000);
+}
+
+function stopLonelyPace() {
+  if (paceInterval) { clearInterval(paceInterval); paceInterval = null; }
+  petImg.classList.remove('lonely-pace', 'lonely-sit', 'lonely-cry');
+  resetIdle();
+}
+
+function showLoveConfession() {
+  const msg = loveMsgs[Math.floor(Math.random() * loveMsgs.length)];
+  loveConfession.textContent = msg;
+  loveConfession.classList.remove('show');
+  void loveConfession.offsetWidth;
+  loveConfession.classList.add('show');
+}
+
 setInterval(() => {
   if (isSleeping) return;
   const idle = Date.now() - lastInteraction;
   
   if (idle > 30 * 60 * 1000) {
     if (lonelyStage < 5) { lonelyStage = 5; window.petEngine.sleep(); }
-  } else if (idle > 25 * 60 * 1000) {
+  } else if (idle > 20 * 60 * 1000) {
     if (lonelyStage < 4) {
       lonelyStage = 4;
+      stopLonelyPace();
       petImg.style.animation = '';
-      petImg.style.transform = 'scale(0.8) rotate(-5deg)';
-      window.petEngine.showBubble('……要睡着了', 'lonely');
-    }
-  } else if (idle > 20 * 60 * 1000) {
-    if (lonelyStage < 3) {
-      lonelyStage = 3;
-      petImg.style.animation = '';
-      petImg.style.transform = 'scale(0.85)';
-      window.petEngine.showBubble('好无聊…你还在吗', 'lonely');
-    }
-  } else if (idle > 15 * 60 * 1000) {
-    if (lonelyStage < 2) {
-      lonelyStage = 2;
-      window.petEngine.showBubble('看看我嘛…', 'lonely');
+      petImg.classList.add('lonely-cry');
+      window.petEngine.showBubble('好想你…回来嘛', 'lonely');
+      showLoveConfession();
+      if (!confessionInterval) {
+        confessionInterval = setInterval(showLoveConfession, 15000);
+      }
     }
   } else if (idle > 10 * 60 * 1000) {
+    if (lonelyStage < 3) {
+      lonelyStage = 3;
+      stopLonelyPace();
+      petImg.style.animation = '';
+      petImg.classList.add('lonely-sit');
+      window.petEngine.showBubble('你还在吗…', 'lonely');
+      showLoveConfession();
+    }
+  } else if (idle > 5 * 60 * 1000) {
+    if (lonelyStage < 2) {
+      lonelyStage = 2;
+      startLonelyPace();
+      window.petEngine.showBubble('好无聊…看看我嘛', 'lonely');
+    }
+  } else if (idle > 2 * 60 * 1000) {
     if (lonelyStage < 1) {
       lonelyStage = 1;
       window.petEngine.showBubble('你在干嘛呀…', 'lonely');
     }
+  }
+  
+  // Reset confession interval when user comes back
+  if (idle < 60000 && confessionInterval) {
+    clearInterval(confessionInterval);
+    confessionInterval = null;
   }
 }, 30000);
 

@@ -106,6 +106,11 @@ class OverlayService : Service() {
                                 "window.petEngine && window.petEngine.onScreenLongPress($targetX, $targetY)", null
                             )
                         }
+                        "scroll_follow" -> {
+                            overlayView?.evaluateJavascript(
+                                "window.petEngine && window.petEngine.onScreenLongPress($targetX, $targetY)", null
+                            )
+                        }
                     }
                 }
             }, delayPerStep * i)

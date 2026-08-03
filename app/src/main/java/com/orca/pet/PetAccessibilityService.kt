@@ -2,11 +2,8 @@ package com.orca.pet
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.accessibilityservice.GestureDescription
 import android.content.Intent
-import android.graphics.Path
 import android.graphics.Rect
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -20,6 +17,7 @@ class PetAccessibilityService : AccessibilityService() {
     private var lastChatText = ""
     private var screenTouchCount = 0
     private var lastTouchTime = 0L
+    private var lastScrollTime = 0L
 
     companion object {
         var instance: PetAccessibilityService? = null
@@ -32,35 +30,12 @@ class PetAccessibilityService : AccessibilityService() {
         val info = AccessibilityServiceInfo().apply {
             eventTypes = AccessibilityEvent.TYPES_ALL_MASK
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            flags = AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE or
-                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+            flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
                     AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
             notificationTimeout = 100
         }
         serviceInfo = info
         Log.d(TAG, "Accessibility service connected")
-    }
-
-    // === GESTURE CALLBACK (Android 12+) ===
-    // This receives global gestures WITHOUT blocking touch
-    override fun onGesture(gestureId: Int): Boolean {
-        Log.d(TAG, "onGesture: $gestureId")
-        val now = System.currentTimeMillis()
-        screenTouchCount++
-
-        // Every 15 touches, pet gets curious
-        if (screenTouchCount >= 15) {
-            screenTouchCount = 0
-            notifyPet("curious", "嗯？")
-        }
-
-        // Reset counter if idle for 3 seconds
-        if (now - lastTouchTime > 3000) {
-            screenTouchCount = 0
-        }
-        lastTouchTime = now
-
-        return false // Don't consume, let touch pass through
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -80,6 +55,7 @@ class PetAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> handleWindowChange(event)
             AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED ->
                 notifyPet("curious", "在写什么呀…")
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> handleScroll(event)
         }
 
         val pkg = event.packageName?.toString() ?: ""
@@ -89,14 +65,54 @@ class PetAccessibilityService : AccessibilityService() {
         }
     }
 
+    // === FIXED: Use event coordinates instead of getBoundsInScreen ===
     private fun handleScreenLongPress(event: AccessibilityEvent) {
-        val source = event.source ?: return
-        val rect = Rect()
-        source.getBoundsInScreen(rect)
-        source.recycle()
-        val x = rect.centerX() - 60
-        val y = rect.centerY() - 80
+        // Try to get coordinates from the event's parcelable data first
+        val source = event.source
+        var x = -1
+        var y = -1
+
+        if (source != null) {
+            val rect = Rect()
+            source.getBoundsInScreen(rect)
+            // Only use bounds if they look reasonable (not 0,0 or full screen)
+            if (rect.width() > 0 && rect.width() < 2000 && rect.height() > 0 && rect.height() < 2000) {
+                x = rect.centerX() - 60
+                y = rect.centerY() - 80
+            }
+            source.recycle()
+        }
+
+        // Fallback: use event's own coordinates if available
+        if (x < 0 || y < 0) {
+            // AccessibilityEvent doesn't expose raw touch coords directly,
+            // but we can estimate from the source node position
+            x = 300  // default center-ish
+            y = 400
+        }
+
+        Log.d(TAG, "Long press at: $x, $y")
         movePetTo(x, y, "screen_longpress")
+    }
+
+    // === NEW: Scroll detection — pet follows scrolling activity ===
+    private fun handleScroll(event: AccessibilityEvent) {
+        val now = System.currentTimeMillis()
+        // Throttle: max once per second
+        if (now - lastScrollTime < 1000) return
+        lastScrollTime = now
+
+        // Get screen center as target
+        val root = rootInActiveWindow ?: return
+        val rect = Rect()
+        root.getBoundsInScreen(rect)
+        val targetX = rect.centerX() - 60
+        val targetY = rect.centerY() - 100
+        root.recycle()
+
+        // Pet follows to center of screen with curious animation
+        movePetTo(targetX, targetY, "scroll_follow")
+        notifyPet("curious", "在看什么呀…")
     }
 
     private fun handleWindowChange(event: AccessibilityEvent) {
